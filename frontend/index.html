@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Project Rating System</title>
+    <link rel="stylesheet" href="style.css" />
+    <!-- טעינת אייקונים של Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+<h1>Project Rating System</h1>
+
+<form id="projectForm">
+    <input type="text" id="name" placeholder="Project Name" required />
+    <textarea id="description" placeholder="Project Description"></textarea>
+    <input type="text" id="image" placeholder="Image URL" />
+    <input type="text" id="link" placeholder="Link URL" />
+
+    <div class="star-rating">
+        <input type="radio" name="rating" id="5-stars" value="5" /><label for="5-stars">★</label>
+        <input type="radio" name="rating" id="4-stars" value="4" /><label for="4-stars">★</label>
+        <input type="radio" name="rating" id="3-stars" value="3" /><label for="3-stars">★</label>
+        <input type="radio" name="rating" id="2-stars" value="2" /><label for="2-stars">★</label>
+        <input type="radio" name="rating" id="1-star" value="1" /><label for="1-star">★</label>
+    </div>
+
+    <button type="submit">Save Project</button>
+</form>
+
+<h2>Projects</h2>
+<div class="projects-grid" id="projectsContainer"></div>
+
+<script>
+    const API_URL = 'http://localhost:5000/api/projects';
+
+    function getStars(rating) {
+        rating = parseInt(rating) || 0;
+        return '★'.repeat(rating) + '☆'.repeat(5 - rating);
+    }
+
+    async function loadProjects() {
+        const res = await fetch(API_URL);
+        const projects = await res.json();
+        const container = document.getElementById('projectsContainer');
+        container.innerHTML = '';
+        projects.forEach(p => {
+            const card = document.createElement('div');
+            card.className = 'project-card';
+            card.innerHTML = `
+          ${p.image ? `<img src="${p.image}" alt="${p.name}" />` : ''}
+          <h3>${p.name}</h3>
+          <p>${p.description || ''}</p>
+          <p class="stars">${getStars(p.rating)}</p>
+          <button onclick="event.stopPropagation();editProject(${p.id}, '${p.name.replace(/'/g, "\\'")}', '${(p.description || '').replace(/'/g, "\\'")}', '${(p.image || '').replace(/'/g, "\\'")}', '${(p.link || '').replace(/'/g, "\\'")}', ${p.rating || 0})">
+            <i class="fas fa-edit"></i> Edit
+          </button>
+          <button onclick="event.stopPropagation();deleteProject(${p.id})">
+            <i class="fas fa-trash"></i> Delete
+          </button>
+        `;
+            card.addEventListener('click', () => viewProject(p.id));
+            container.appendChild(card);
+        });
+    }
+
+    function viewProject(id) {
+        window.location.href = `project.html?id=${id}`;
+    }
+
+    async function deleteProject(id) {
+        if (confirm('האם אתה בטוח שברצונך למחוק את הפרויקט הזה?')) {
+            await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+            alert('הפרויקט נמחק בהצלחה');
+            loadProjects();
+        }
+    }
+
+    function editProject(id, name, description, image, link, rating) {
+        document.getElementById('name').value = name;
+        document.getElementById('description').value = description;
+        document.getElementById('image').value = image;
+        document.getElementById('link').value = link;
+        document.querySelectorAll('input[name="rating"]').forEach(r => r.checked = false);
+        if (rating > 0) document.getElementById(`${rating}-stars`).checked = true;
+        document.getElementById('projectForm').dataset.editId = id;
+    }
+
+    document.getElementById('projectForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('projectForm').dataset.editId;
+        const name = document.getElementById('name').value;
+        const description = document.getElementById('description').value;
+        const image = document.getElementById('image').value;
+        const link = document.getElementById('link').value;
+        const ratingInput = document.querySelector('input[name="rating"]:checked');
+        const rating = ratingInput ? ratingInput.value : 0;
+
+        if (id) {
+            await fetch(`${API_URL}/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, description, image, link, rating })
+            });
+            delete document.getElementById('projectForm').dataset.editId;
+        } else {
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, description, image, link, rating })
+            });
+        }
+        document.getElementById('projectForm').reset();
+        document.querySelectorAll('input[name="rating"]').forEach(r => r.checked = false);
+        loadProjects();
+    });
+
+    loadProjects();
+</script>
+</body>
+</html>
